@@ -44,7 +44,10 @@ def load_data():
         errors="coerce"
     )
 
+    # ----------------------------------------------
+    # 장르
     # 여러 장르가 있으면 첫 번째 장르만 사용
+    # ----------------------------------------------
     df["genre"] = (
         df["genre"]
         .fillna("미상")
@@ -54,10 +57,32 @@ def load_data():
         .str.strip()
     )
 
-    # 빈 장르는 미상으로 처리
-    df.loc[df["genre"].eq(""), "genre"] = "미상"
+    df.loc[
+        df["genre"].eq(""),
+        "genre"
+    ] = "미상"
 
+    # ----------------------------------------------
+    # 제작 국가
+    # 여러 국가가 있으면 첫 번째 국가만 사용
+    # ----------------------------------------------
+    df["nation"] = (
+        df["nation"]
+        .fillna("미상")
+        .astype(str)
+        .str.split("|")
+        .str[0]
+        .str.strip()
+    )
+
+    df.loc[
+        df["nation"].eq(""),
+        "nation"
+    ] = "미상"
+
+    # ----------------------------------------------
     # 숫자형 데이터 변환
+    # ----------------------------------------------
     numeric_columns = [
         "first_scrn",
         "first_show",
@@ -251,7 +276,6 @@ st.plotly_chart(
 
 
 # 가장 많은 영화가 몰린 구간 계산
-# pd.np가 아니라 numpy를 사용
 hist_counts, bin_edges = np.histogram(
     hist_df["total_audi"],
     bins=20
@@ -540,6 +564,60 @@ st.text_area(
     ),
     height=80,
     key="graph6_note"
+)
+
+
+# ==================================================
+# 그래프 7
+# 제작 국가 → 장르 선버스트
+# ==================================================
+st.header("그래프 7. 제작 국가와 장르별 영화 구성")
+
+sunburst_df = df[
+    ["nation", "genre"]
+].copy()
+
+# 영화 편수를 세기 위한 값
+sunburst_df["영화편수"] = 1
+
+fig7 = px.sunburst(
+    sunburst_df,
+    path=["nation", "genre"],
+    values="영화편수",
+    title="제작 국가 → 장르별 영화 구성",
+)
+
+fig7.update_traces(
+    hovertemplate=(
+        "<b>%{label}</b><br>"
+        "영화 편수: %{value}편"
+        "<extra></extra>"
+    )
+)
+
+fig7.update_layout(
+    height=700
+)
+
+st.plotly_chart(
+    fig7,
+    use_container_width=True
+)
+
+st.write(
+    "※ 바깥쪽으로 갈수록 세부적인 장르를 나타냅니다. "
+    "각 칸의 크기는 해당 제작 국가와 장르에 속하는 영화 편수를 의미합니다."
+)
+
+st.subheader("이 그래프로 알 수 있는 것")
+
+st.text_area(
+    "한 문장으로 정리해 보세요.",
+    placeholder=(
+        "예: ○○ 국가에서는 ○○ 장르의 영화가 많이 나타난다."
+    ),
+    height=80,
+    key="graph7_note"
 )
 
 
