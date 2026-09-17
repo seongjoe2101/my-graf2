@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -16,7 +17,11 @@ st.write("1년간 박스오피스 10위권에 든 영화 216편의 데이터를 
 # -----------------------------------
 # 데이터 불러오기
 # -----------------------------------
-DATA_URL = "https://raw.githubusercontent.com/greatsong/modudata/main/data/kobis_movies.csv"
+DATA_URL = (
+    "https://raw.githubusercontent.com/greatsong/modudata/"
+    "main/data/kobis_movies.csv"
+)
+
 
 @st.cache_data
 def load_data():
@@ -42,6 +47,12 @@ def load_data():
     # 빈 장르는 미상으로 처리
     df["genre"] = df["genre"].replace("", "미상")
 
+    # 관객 수를 숫자로 변환
+    df["total_audi"] = pd.to_numeric(
+        df["total_audi"],
+        errors="coerce"
+    ).fillna(0)
+
     return df
 
 
@@ -55,7 +66,7 @@ except Exception as e:
 
 
 # -----------------------------------
-# 데이터 확인
+# 데이터 정보
 # -----------------------------------
 st.subheader("데이터 정보")
 
@@ -68,13 +79,12 @@ with col2:
     st.metric("장르 종류", f"{df['genre'].nunique():,}개")
 
 
-# -----------------------------------
+# ===================================
 # 그래프 1
-# -----------------------------------
+# ===================================
 st.divider()
 st.header("그래프 1. 장르별 영화 편수")
 
-# 장르별 영화 편수 계산
 genre_counts = (
     df["genre"]
     .value_counts()
@@ -83,8 +93,7 @@ genre_counts = (
 
 genre_counts.columns = ["장르", "영화편수"]
 
-# 도넛 그래프
-fig = px.pie(
+fig1 = px.pie(
     genre_counts,
     names="장르",
     values="영화편수",
@@ -92,7 +101,7 @@ fig = px.pie(
     title="장르별 영화 편수"
 )
 
-fig.update_traces(
+fig1.update_traces(
     textposition="inside",
     textinfo="percent",
     hovertemplate=(
@@ -102,29 +111,96 @@ fig.update_traces(
     )
 )
 
-fig.update_layout(
+fig1.update_layout(
     height=550,
     legend_title_text="장르"
 )
 
-st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(
+    fig1,
+    use_container_width=True
+)
 
-# -----------------------------------
-# 설명 작성 공간
-# -----------------------------------
 st.subheader("이 그래프로 알 수 있는 것")
 
 st.text_area(
     "한 문장으로 정리해 보세요.",
-    placeholder="예: 이 기간에는 ○○ 장르의 영화가 가장 많았고, 전체 영화 중 약 ○○%를 차지했다.",
+    placeholder=(
+        "예: 이 기간에는 ○○ 장르의 영화가 가장 많았고, "
+        "전체 영화 중 약 ○○%를 차지했다."
+    ),
     height=80,
     key="graph1_note"
 )
 
 
-# -----------------------------------
-# 원본 데이터 일부 확인
-# -----------------------------------
+# ===================================
+# 그래프 2
+# ===================================
+st.divider()
+st.header("그래프 2. 장르별 영화와 총 관객 트리맵")
+
+st.write(
+    "장르 안에 각 영화가 들어 있으며, "
+    "칸의 크기는 총 관객 수를 나타냅니다."
+)
+
+# 트리맵에 사용할 데이터
+treemap_df = df[
+    ["genre", "movieNm", "total_audi"]
+].copy()
+
+# 영화명이 비어 있으면 미상 처리
+treemap_df["movieNm"] = (
+    treemap_df["movieNm"]
+    .fillna("영화명 미상")
+    .astype(str)
+)
+
+# 총 관객이 0인 데이터도 표시할 수 있도록 최소값 처리
+# 실제 total_audi 값은 hover에 그대로 사용
+treemap_df["트리맵크기"] = treemap_df["total_audi"]
+
+fig2 = px.treemap(
+    treemap_df,
+    path=["genre", "movieNm"],
+    values="트리맵크기",
+    title="장르별 영화 총 관객 트리맵"
+)
+
+fig2.update_traces(
+    hovertemplate=(
+        "<b>%{label}</b><br>"
+        "총 관객: %{value:,.0f}명"
+        "<extra></extra>"
+    )
+)
+
+fig2.update_layout(
+    height=700
+)
+
+st.plotly_chart(
+    fig2,
+    use_container_width=True
+)
+
+st.subheader("이 그래프로 알 수 있는 것")
+
+st.text_area(
+    "한 문장으로 정리해 보세요.",
+    placeholder=(
+        "예: 총 관객이 많은 영화는 ○○ 장르에 많이 분포하며, "
+        "특히 ○○ 영화의 관객 규모가 크게 나타난다."
+    ),
+    height=80,
+    key="graph2_note"
+)
+
+
+# ===================================
+# 원본 데이터
+# ===================================
 st.divider()
 st.subheader("원본 데이터 확인")
 
