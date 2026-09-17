@@ -13,6 +13,7 @@ st.set_page_config(
 st.title("영화 데이터 그래프 도감 2 - 분포와 관계")
 st.write("1년간 박스오피스 10위권에 든 영화 216편의 데이터를 살펴봅니다.")
 
+
 # -----------------------------------
 # 데이터 불러오기
 # -----------------------------------
@@ -33,7 +34,7 @@ def load_data():
         errors="coerce"
     )
 
-    # 여러 장르가 |로 연결되어 있다면 첫 번째 장르만 사용
+    # 여러 장르가 |로 연결되어 있으면 첫 번째 장르만 사용
     df["genre"] = (
         df["genre"]
         .fillna("미상")
@@ -46,12 +47,22 @@ def load_data():
     # 빈 장르는 미상으로 처리
     df["genre"] = df["genre"].replace("", "미상")
 
-    # 총 관객 수를 숫자로 변환
-    df["total_audi"] = pd.to_numeric(
-        df["total_audi"],
-        errors="coerce"
-    ).fillna(0)
+    # 숫자형 데이터 변환
+    numeric_columns = [
+        "first_scrn",
+        "first_show",
+        "first_week_audi",
+        "total_audi",
+        "days_in_top10"
+    ]
 
+    for column in numeric_columns:
+        df[column] = pd.to_numeric(
+            df[column],
+            errors="coerce"
+        )
+
+    # 결측값은 비워 둠
     return df
 
 
@@ -154,12 +165,15 @@ treemap_df["movieNm"] = (
     .astype(str)
 )
 
-treemap_df["트리맵크기"] = treemap_df["total_audi"]
+# 총 관객이 없는 데이터는 트리맵에서 제외
+treemap_df = treemap_df.dropna(
+    subset=["total_audi"]
+)
 
 fig2 = px.treemap(
     treemap_df,
     path=["genre", "movieNm"],
-    values="트리맵크기",
+    values="total_audi",
     title="장르별 영화 총 관객 트리맵"
 )
 
@@ -203,7 +217,6 @@ st.write(
     "영화별 total_audi(총 관객)가 어느 구간에 많이 분포하는지 확인합니다."
 )
 
-# 총 관객 데이터
 hist_df = df[
     ["movieNm", "total_audi"]
 ].copy()
@@ -214,7 +227,10 @@ hist_df["movieNm"] = (
     .astype(str)
 )
 
-# 히스토그램
+hist_df = hist_df.dropna(
+    subset=["total_audi"]
+)
+
 fig3 = px.histogram(
     hist_df,
     x="total_audi",
@@ -246,9 +262,7 @@ st.plotly_chart(
 )
 
 
-# -----------------------------------
 # 가장 많이 몰린 구간 계산
-# -----------------------------------
 hist_counts, bin_edges = pd.cut(
     hist_df["total_audi"],
     bins=20,
@@ -269,15 +283,11 @@ max_audience_row = hist_df.loc[
 max_movie_name = max_audience_row["movieNm"]
 max_audience = max_audience_row["total_audi"]
 
-
-# -----------------------------------
-# 그래프 아래 결과 문구
-# -----------------------------------
 st.subheader("이 그래프로 알 수 있는 것")
 
 st.write(
-    f"대부분의 영화는 **{bin_start:,.0f}명 ~ {bin_end:,.0f}명** "
-    f"정도의 총 관객 구간에 몰려 있습니다."
+    f"대부분의 영화는 **{bin_start:,.0f}명 ~ "
+    f"{bin_end:,.0f}명** 정도의 총 관객 구간에 몰려 있습니다."
 )
 
 st.write(
@@ -293,6 +303,96 @@ st.text_area(
     ),
     height=80,
     key="graph3_note"
+)
+
+
+# ===================================
+# 그래프 4
+# ===================================
+st.divider()
+st.header("그래프 4. 개봉일 스크린수와 총 관객의 관계")
+
+st.write(
+    "개봉일에 몇 개의 스크린에서 상영했는지와 "
+    "최종적으로 기록한 총 관객 사이의 관계를 살펴봅니다."
+)
+
+scatter_df = df[
+    ["movieNm", "genre", "first_scrn", "total_audi"]
+].copy()
+
+scatter_df["movieNm"] = (
+    scatter_df["movieNm"]
+    .fillna("영화명 미상")
+    .astype(str)
+)
+
+scatter_df["genre"] = (
+    scatter_df["genre"]
+    .fillna("미상")
+    .astype(str)
+)
+
+# 산점도에 필요한 값이 없는 행 제외
+scatter_df = scatter_df.dropna(
+    subset=["first_scrn", "total_audi"]
+)
+
+fig4 = px.scatter(
+    scatter_df,
+    x="first_scrn",
+    y="total_audi",
+    color="genre",
+    hover_name="movieNm",
+    hover_data={
+        "genre": True,
+        "first_scrn": ":,.0f",
+        "total_audi": ":,.0f"
+    },
+    labels={
+        "first_scrn": "개봉일 스크린수",
+        "total_audi": "총 관객",
+        "genre": "장르"
+    },
+    title="개봉일 스크린수와 총 관객의 관계"
+)
+
+fig4.update_traces(
+    marker=dict(
+        size=10,
+        opacity=0.75
+    ),
+    hovertemplate=(
+        "<b>%{hovertext}</b><br>"
+        "장르: %{customdata[0]}<br>"
+        "개봉일 스크린수: %{x:,.0f}개<br>"
+        "총 관객: %{y:,.0f}명"
+        "<extra></extra>"
+    )
+)
+
+fig4.update_layout(
+    height=650,
+    xaxis_title="개봉일 스크린수",
+    yaxis_title="총 관객",
+    legend_title_text="장르"
+)
+
+st.plotly_chart(
+    fig4,
+    use_container_width=True
+)
+
+st.subheader("이 그래프로 알 수 있는 것")
+
+st.text_area(
+    "한 문장으로 정리해 보세요.",
+    placeholder=(
+        "예: 개봉일 스크린수가 많을수록 총 관객이 많은 영화가 "
+        "나타나는 경향이 있는지 확인할 수 있다."
+    ),
+    height=80,
+    key="graph4_note"
 )
 
 
