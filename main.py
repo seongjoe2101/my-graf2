@@ -62,7 +62,6 @@ def load_data():
             errors="coerce"
         )
 
-    # 결측값은 비워 둠
     return df
 
 
@@ -165,7 +164,6 @@ treemap_df["movieNm"] = (
     .astype(str)
 )
 
-# 총 관객이 없는 데이터는 트리맵에서 제외
 treemap_df = treemap_df.dropna(
     subset=["total_audi"]
 )
@@ -333,7 +331,6 @@ scatter_df["genre"] = (
     .astype(str)
 )
 
-# 산점도에 필요한 값이 없는 행 제외
 scatter_df = scatter_df.dropna(
     subset=["first_scrn", "total_audi"]
 )
@@ -393,6 +390,105 @@ st.text_area(
     ),
     height=80,
     key="graph4_note"
+)
+
+
+# ===================================
+# 그래프 5
+# ===================================
+st.divider()
+st.header("그래프 5. 장르별 총 관객 분포")
+
+st.write(
+    "영화가 10편 이상인 장르만 골라 장르별 총 관객의 분포를 비교합니다."
+)
+
+# 장르별 영화 수 계산
+genre_movie_counts = (
+    df["genre"]
+    .value_counts()
+)
+
+# 영화가 10편 이상인 장르만 선택
+valid_genres = genre_movie_counts[
+    genre_movie_counts >= 10
+].index.tolist()
+
+boxplot_df = df[
+    df["genre"].isin(valid_genres)
+].copy()
+
+boxplot_df = boxplot_df.dropna(
+    subset=["total_audi"]
+)
+
+boxplot_df["movieNm"] = (
+    boxplot_df["movieNm"]
+    .fillna("영화명 미상")
+    .astype(str)
+)
+
+if len(valid_genres) == 0:
+    st.warning(
+        "영화가 10편 이상인 장르가 없어 박스플롯을 그릴 수 없습니다."
+    )
+
+else:
+    fig5 = px.box(
+        boxplot_df,
+        x="genre",
+        y="total_audi",
+        color="genre",
+        points="outliers",
+        hover_name="movieNm",
+        hover_data={
+            "genre": True,
+            "total_audi": ":,.0f"
+        },
+        labels={
+            "genre": "장르",
+            "total_audi": "총 관객"
+        },
+        title="영화가 10편 이상인 장르의 총 관객 분포"
+    )
+
+    fig5.update_traces(
+        hovertemplate=(
+            "<b>%{hovertext}</b><br>"
+            "장르: %{customdata[0]}<br>"
+            "총 관객: %{y:,.0f}명"
+            "<extra></extra>"
+        )
+    )
+
+    fig5.update_layout(
+        height=650,
+        xaxis_title="장르",
+        yaxis_title="총 관객",
+        showlegend=False
+    )
+
+    st.plotly_chart(
+        fig5,
+        use_container_width=True
+    )
+
+    st.write(
+        "※ 상자 밖에 표시된 점은 해당 장르의 일반적인 관객 분포에서 "
+        "벗어난 값이며, 마우스를 올리면 영화명을 확인할 수 있습니다."
+    )
+
+
+st.subheader("이 그래프로 알 수 있는 것")
+
+st.text_area(
+    "한 문장으로 정리해 보세요.",
+    placeholder=(
+        "예: ○○ 장르는 총 관객의 분포가 넓고, "
+        "○○ 장르에서는 관객이 특히 많은 영화가 이상치로 나타난다."
+    ),
+    height=80,
+    key="graph5_note"
 )
 
 
