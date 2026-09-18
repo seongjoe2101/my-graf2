@@ -25,10 +25,10 @@ st.write(
 
 
 # --------------------------------------------------
-# 데이터 불러오기
+# 영화 데이터 불러오기
 # --------------------------------------------------
 @st.cache_data
-def load_data():
+def load_movie_data():
 
     url = (
         "https://raw.githubusercontent.com/greatsong/modudata/"
@@ -44,10 +44,7 @@ def load_data():
         errors="coerce"
     )
 
-    # ----------------------------------------------
-    # 장르
     # 여러 장르가 있으면 첫 번째 장르만 사용
-    # ----------------------------------------------
     df["genre"] = (
         df["genre"]
         .fillna("미상")
@@ -62,10 +59,7 @@ def load_data():
         "genre"
     ] = "미상"
 
-    # ----------------------------------------------
-    # 제작 국가
-    # 여러 국가가 있으면 첫 번째 국가만 사용
-    # ----------------------------------------------
+    # 여러 제작 국가가 있으면 첫 번째 국가만 사용
     df["nation"] = (
         df["nation"]
         .fillna("미상")
@@ -80,9 +74,7 @@ def load_data():
         "nation"
     ] = "미상"
 
-    # ----------------------------------------------
     # 숫자형 데이터 변환
-    # ----------------------------------------------
     numeric_columns = [
         "first_scrn",
         "first_show",
@@ -100,7 +92,39 @@ def load_data():
     return df
 
 
-df = load_data()
+df = load_movie_data()
+
+
+# --------------------------------------------------
+# 일별 박스오피스 데이터 불러오기
+# --------------------------------------------------
+@st.cache_data
+def load_daily_data():
+
+    url = (
+        "https://raw.githubusercontent.com/greatsong/modudata/"
+        "main/data/kobis_daily.csv"
+    )
+
+    daily_df = pd.read_csv(url)
+
+    # 순위를 숫자로 변환
+    daily_df["순위"] = pd.to_numeric(
+        daily_df["순위"],
+        errors="coerce"
+    )
+
+    # 날짜를 날짜 형식으로 변환
+    daily_df["날짜"] = pd.to_datetime(
+        daily_df["날짜"].astype(str),
+        format="%Y%m%d",
+        errors="coerce"
+    )
+
+    return daily_df
+
+
+daily_df = load_daily_data()
 
 
 # ==================================================
@@ -577,14 +601,14 @@ sunburst_df = df[
     ["nation", "genre"]
 ].copy()
 
-# 영화 편수를 세기 위한 값
+# 영화 한 편을 1개로 계산
 sunburst_df["영화편수"] = 1
 
 fig7 = px.sunburst(
     sunburst_df,
     path=["nation", "genre"],
     values="영화편수",
-    title="제작 국가 → 장르별 영화 구성",
+    title="제작 국가 → 장르별 영화 구성"
 )
 
 fig7.update_traces(
@@ -605,8 +629,8 @@ st.plotly_chart(
 )
 
 st.write(
-    "※ 바깥쪽으로 갈수록 세부적인 장르를 나타냅니다. "
-    "각 칸의 크기는 해당 제작 국가와 장르에 속하는 영화 편수를 의미합니다."
+    "※ 안쪽은 제작 국가, 바깥쪽은 장르를 나타냅니다. "
+    "각 칸의 크기는 영화 편수를 의미합니다."
 )
 
 st.subheader("이 그래프로 알 수 있는 것")
@@ -618,6 +642,95 @@ st.text_area(
     ),
     height=80,
     key="graph7_note"
+)
+
+
+# ==================================================
+# 그래프 8
+# 1위에 가장 오랜기간 머물렀던 영화
+# ==================================================
+st.header("그래프 8. 1위에 가장 오랜기간 머물렀던 영화를 알고싶어")
+
+# 순위가 1위인 데이터만 추출
+rank1_df = daily_df[
+    daily_df["순위"] == 1
+].copy()
+
+# 영화명 결측치 처리
+rank1_df["영화명"] = (
+    rank1_df["영화명"]
+    .fillna("영화명 미상")
+    .astype(str)
+)
+
+# 영화별 1위 횟수 계산
+rank1_counts = (
+    rank1_df
+    .groupby("영화명")
+    .size()
+    .reset_index(name="1위에 있었던 날짜")
+)
+
+# 많은 순서대로 정렬
+rank1_counts = (
+    rank1_counts
+    .sort_values(
+        "1위에 있었던 날짜",
+        ascending=False
+    )
+)
+
+# 영화가 너무 많아지는 것을 방지하기 위해
+# 1위 경험이 있는 영화 전체를 표시
+fig8 = px.bar(
+    rank1_counts,
+    x="영화명",
+    y="1위에 있었던 날짜",
+    hover_name="영화명",
+    hover_data={
+        "1위에 있었던 날짜": ":,.0f"
+    },
+    labels={
+        "영화명": "영화 이름",
+        "1위에 있었던 날짜": "1위에 있었던 날짜"
+    },
+    title="1위에 가장 오랜기간 머물렀던 영화를 알고싶어"
+)
+
+fig8.update_traces(
+    hovertemplate=(
+        "<b>%{hovertext}</b><br>"
+        "1위에 있었던 날짜: %{y}일"
+        "<extra></extra>"
+    )
+)
+
+fig8.update_layout(
+    height=700,
+    xaxis_title="영화 이름",
+    yaxis_title="1위에 있었던 날짜",
+    xaxis_tickangle=-45
+)
+
+st.plotly_chart(
+    fig8,
+    use_container_width=True
+)
+
+st.write(
+    "※ 일별 박스오피스에서 순위가 1위였던 날짜를 영화별로 세어 "
+    "1위 유지 기간을 계산했습니다."
+)
+
+st.subheader("이 그래프로 알 수 있는 것")
+
+st.text_area(
+    "한 문장으로 정리해 보세요.",
+    placeholder=(
+        "예: 1위에 가장 오랜 기간 머문 영화는 ○○이다."
+    ),
+    height=80,
+    key="graph8_note"
 )
 
 
